@@ -57,7 +57,8 @@ module Guard
         Process.kill(:INT, @zeus_pid)
 
         begin
-          unless Process.waitpid(@zeus_pid, Process::WNOHANG)
+          #unless Process.waitpid(@zeus_pid, Process::WNOHANG)
+          unless Process.waitpid(@zeus_pid, 0)
             Process.kill(:KILL, @zeus_pid)
           end
         rescue Errno::ECHILD
