@@ -81,6 +81,7 @@ module Guard
 
       def zeus_serve_command
         cmd_parts = []
+        cmd_parts << options[:pre_cli] unless options[:pre_cli].nil?
         cmd_parts << "bundle exec" if bundler?
         cmd_parts << "zeus start"
         cmd_parts.join(' ')
