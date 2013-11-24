@@ -23,22 +23,22 @@ module Guard
       end
 
       def run(paths)
-        run_command zeus_push_command(paths), zeus_push_options
+        #run_command zeus_push_command(paths), zeus_push_options
       end
 
       def run_all
-        return unless options[:run_all]
-        if rspec?
-          run(['rspec'])
-        elsif test_unit?
-          run(Dir['test/**/*_test.rb']+Dir['test/**/test_*.rb'])
-        end
+        #return unless options[:run_all]
+        #if rspec?
+        #  run(['rspec'])
+        #elsif test_unit?
+        #  run(Dir['test/**/*_test.rb']+Dir['test/**/test_*.rb'])
+        #end
       end
 
       private
 
       def sockfile
-          File.join(Dir.pwd, ".zeus.sock")
+        File.join(Dir.pwd, ".zeus.sock")
       end
 
       def run_command(cmd, options = '')
@@ -46,25 +46,63 @@ module Guard
       end
 
       def spawn_zeus(cmd, options = '')
-        @zeus_pid = fork do
-          exec "#{cmd} #{options}"
+        #@zeus_pid = fork do
+        #  exec "#{cmd} #{options} &"
+        #end
+        system "#{cmd} #{options} &"
+        #sleep 1
+        loop do
+          @zeus_pid=`pidof zeus-linux-amd64`.to_i
+          break unless @zeus_pid == 0
         end
+        UI.info "pid=#{@zeus_pid}", :reset => true
       end
 
       def stop_zeus
-        return unless @zeus_pid
+        while (@zeus_pid = `pidof zeus-linux-amd64`.to_i) != 0
+          UI.info "Stopping Zeus PID=#{@zeus_pid}", :reset => true
 
-        Process.kill(:INT, @zeus_pid)
-
-        begin
-          #unless Process.waitpid(@zeus_pid, Process::WNOHANG)
-          unless Process.waitpid(@zeus_pid, 0)
-            Process.kill(:KILL, @zeus_pid)
+          begin
+            Timeout::timeout(10) {
+              Process.kill(:INT, @zeus_pid)
+              begin
+                loop { Process.kill(0, @zeus_pid); sleep 0.01 }
+              rescue Errno::ESRCH
+              end
+            }
+          rescue
+            begin
+              Timeout::timeout(10) {
+                UI.info "Killing Zeus PID=#{@zeus_pid}", :reset => true
+                Process.kill(:KILL, @zeus_pid)
+                begin
+                  loop { Process.kill(0, @zeus_pid); sleep 0.01 }
+                rescue Errno::ESRCH
+                end
+              }
+            rescue
+              raise "Unable to kill Zeus :("
+            end
           end
-        rescue Errno::ECHILD
+          #
+          #Process.kill(:INT, @zeus_pid)
+          #
+          #begin
+          #  #unless Process.waitpid(@zeus_pid, Process::WNOHANG)
+          #  unless Process.waitpid(@zeus_pid, 0)
+          #    UI.info "Killing Zeus PID=#{@zeus_pid}", :reset => true
+          #    Process.kill(:KILL, @zeus_pid)
+          #  end
+          #rescue Errno::ECHILD
+          #end
+          #File.delete(sockfile) if File.exist? sockfile
+          UI.info "Zeus Stopped PID=#{@zeus_pid}", :reset => true
         end
-        File.delete(sockfile) if File.exist? sockfile
-        UI.info "Zeus Stopped", :reset => true
+        sock_file = "#{Dir.pwd}/.zeus.sock"
+        if File.exist?(sock_file)
+          UI.info "Deleting old #{sock_file}", :reset => true
+          File.delete(sock_file)
+        end
       end
 
       def zeus_push_command(paths)
